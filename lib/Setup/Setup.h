@@ -5,15 +5,15 @@ struct Config {
 
 class SetupManager {
     private:
-        char *_configPath;
-        char *_apSsid;
-        char *_apPassword;
+        char* _configPath;
+        char* _apSsid;
+        char* _apPassword;
         Config _currentConfig;
 
         void init();
         Config loadConfig();
         bool saveConfig(Config config);
     public:
-        SetupManager(const char *configPath, const char *apSsid, const char *apPassword);
+        SetupManager(const char* configPath, const char* apSsid, const char* apPassword);
         Config getConfig();
 };
