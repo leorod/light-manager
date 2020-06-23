@@ -46,6 +46,8 @@ void SetupManager::init() {
     wifiManager.addParameter(&mqttHostParam);
     wifiManager.addParameter(&mqttPortParam);
 
+    wifiManager.setConnectTimeout(60);
+    Serial.println("Attempting to connect...");
     if(!wifiManager.autoConnect(_apSsid, _apPassword)) {
         Serial.println("failed to connect and hit timeout");
         delay(3000);
@@ -63,6 +65,12 @@ void SetupManager::init() {
         if (shouldSaveConfig) {
             saveConfig(newConfig);
         }
+
+        while (WiFi.status() != WL_CONNECTED) {
+            Serial.print('.');
+            delay(500);
+        }
+        Serial.println(".");
     }
 }
 
