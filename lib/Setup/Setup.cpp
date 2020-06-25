@@ -23,15 +23,14 @@ Config SetupManager::getConfig() {
 bool shouldSaveConfig = false;
 
 void saveConfigCallback () {
-  Serial.println("Should save config");
   shouldSaveConfig = true;
 }
 
 void configModeCallback(WiFiManager *myWiFiManager) {
-  Serial.println("Entered config mode");
-  Serial.println(WiFi.softAPIP());
+  DB_PRINTLN("Entered config mode");
+  DB_PRINTLN(WiFi.softAPIP());
 
-  Serial.println(myWiFiManager->getConfigPortalSSID());
+  DB_PRINTLN(myWiFiManager->getConfigPortalSSID());
 }
 
 void SetupManager::init() {
@@ -47,15 +46,15 @@ void SetupManager::init() {
     wifiManager.addParameter(&mqttPortParam);
 
     wifiManager.setConnectTimeout(60);
-    Serial.println("Attempting to connect...");
+    DB_PRINTLN("Attempting to connect...");
     if(!wifiManager.autoConnect(_apSsid, _apPassword)) {
-        Serial.println("failed to connect and hit timeout");
+        DB_PRINTLN("Failed to connect and hit timeout");
         delay(3000);
         //reset and try again, or maybe put it to deep sleep
         ESP.reset();
         delay(5000);
     } else {
-        Serial.println("Successfully connected to SSID: " + WiFi.SSID());
+        DB_PRINTLN("Successfully connected to SSID: " + WiFi.SSID());
 
         //read updated parameters
         Config newConfig;
@@ -67,19 +66,19 @@ void SetupManager::init() {
         }
 
         while (WiFi.status() != WL_CONNECTED) {
-            Serial.print('.');
+            DB_PRINT('.');
             delay(500);
         }
-        Serial.println(".");
+        DB_PRINTLN(".");
     }
 }
 
 Config SetupManager::loadConfig() {
     Config config;
     if (LittleFS.begin()) {
-        Serial.println("Filesystem successfully mounted");
+        DB_PRINTLN("Filesystem successfully mounted");
         if (LittleFS.exists(_configPath)) {
-            Serial.println("Reading saved config");
+            DB_PRINTLN("Reading saved config");
             File configFile = LittleFS.open(_configPath, "r");
             if (configFile) {
                 configFile.setTimeout(5000);
@@ -87,8 +86,8 @@ Config SetupManager::loadConfig() {
                 StaticJsonDocument<jsonCapacity> jsonDoc;
                 DeserializationError error = deserializeJson(jsonDoc, configFile);
                 if (error) {
-                    Serial.print("Cannot parse config file: ");
-                    Serial.println(error.c_str());
+                    DB_PRINT("Cannot parse config file: ");
+                    DB_PRINTLN(error.c_str());
                 } else {
                     strlcpy(config.mqtt_host, jsonDoc["mqttHost"], sizeof(config.mqtt_host));
                     strlcpy(config.mqtt_port, jsonDoc["mqttPort"] | "1883", sizeof(config.mqtt_port));
@@ -96,10 +95,10 @@ Config SetupManager::loadConfig() {
             }
             configFile.close();
         } else {
-            Serial.println("No preexisting config found.");
+            DB_PRINTLN("No preexisting config found.");
         }
     } else {
-        Serial.println("Cannot mount filesystem");
+        DB_PRINTLN("Cannot mount filesystem");
     }
     
     return config;
@@ -109,7 +108,7 @@ bool SetupManager::saveConfig(Config config) {
     bool shouldUpdate = strcmp(_currentConfig.mqtt_host, config.mqtt_host) != 0 
         || strcmp(_currentConfig.mqtt_port, config.mqtt_port) != 0;
     if (shouldUpdate) {
-        Serial.println("Settings updated. Saving to file.");
+        DB_PRINTLN("Settings updated. Saving to file.");
         File configFile = LittleFS.open(_configPath, "w");
         if (configFile) {
             const int capacity = JSON_OBJECT_SIZE(2);

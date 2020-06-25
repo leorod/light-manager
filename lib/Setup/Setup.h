@@ -1,3 +1,5 @@
+#include "Commons.h"
+
 struct Config {
   char mqtt_host[40];
   char mqtt_port[6];
