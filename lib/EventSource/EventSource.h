@@ -1,3 +1,4 @@
+#include "Commons.h"
 #include <PubSubClient.h>
 
 struct Event {
@@ -6,26 +7,27 @@ struct Event {
     char* source;
     char* type;
     char* value;
-    char* topic;
 };
 
 class EventHandler {
     public:
-        void handle(Event);
+        virtual boolean accepts(Event event) = 0;
+        virtual void handle(Event event) = 0;
 };
 
 class EventSource {
     private:
         PubSubClient* _mqttClient;
+        EventHandler* _handler;
         char* _topic;
         void init();
         void process(char* topic, byte* payload, unsigned int length);
         Event deserialize(char* message);
         char* serialize(Event event);
-        void log(Event event);
+        void log(char* payload, char* sourceTopic);
         boolean reconnect(char* topic);
         boolean reconnect();
     public:
-        EventSource(PubSubClient& mqttClient, const char* topic);
+        EventSource(PubSubClient& mqttClient, EventHandler& handler, const char* topic);
         void poll();
 };

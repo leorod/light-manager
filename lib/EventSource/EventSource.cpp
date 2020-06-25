@@ -4,20 +4,20 @@
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
 
-EventSource::EventSource(PubSubClient& mqttClient, const char* topic) {
+EventSource::EventSource(PubSubClient& mqttClient, EventHandler& handler, const char* topic) {
     _mqttClient = &mqttClient;
+    _handler = &handler;
     _topic = strdup(topic);
     init();
 }
 
 void EventSource::poll() {
     if (!_mqttClient->connected()) {
-        Serial.println("MQTT Client connection start");
+        DB_PRINTLN("MQTT Client connection start");
         reconnect(_topic);
     }
     _mqttClient->loop();
 }
-
 
 void EventSource::init() {
     _mqttClient->setCallback([this](char* topic, byte* payload, unsigned int length) {
@@ -26,12 +26,16 @@ void EventSource::init() {
 }
 
 void EventSource::process(char* topic, byte* payload, unsigned int length) {
-    Serial.println("Deserializing...");
-    Event event = deserialize((char*) payload);
-    Serial.println("Setting topic...");
-    event.topic = topic;
-    Serial.println("Sending to log...");
-    log(event);
+    char* strPayload = (char*) payload;
+    DB_PRINTLN("Event received:");
+    DB_PRINTLN(strPayload);
+    char srcPayload[length + 1];
+    strlcpy(srcPayload, strPayload, sizeof(srcPayload));
+    Event event = deserialize(strPayload);
+    if (_handler->accepts(event)) {
+        _handler->handle(event);
+    }
+    log(srcPayload, topic);
 }
 
 Event EventSource::deserialize(char* message) {
@@ -47,33 +51,19 @@ Event EventSource::deserialize(char* message) {
     return event;
 }
 
-char* EventSource::serialize(Event event) {
-    Serial.println("Serializing");
-    const int bufferSize = 256;
-    const int capacity = JSON_OBJECT_SIZE(6) + bufferSize;
-    StaticJsonDocument<capacity> json;
-    json["uuid"] = event.uuid;
-    json["type"] = event.type;
-    json["timestamp"] = event.timestamp;
-    json["source"] = event.source;
-    json["value"] = event.value;
-    json["topic"] = event.topic;
-    char buffer[bufferSize];
-    serializeJson(json, buffer);
-    Serial.println(buffer);
-    return buffer;
-}
-
-void EventSource::log(Event event) {
-    _mqttClient->publish("/audit", serialize(event));
+void EventSource::log(char* payload, char* sourceTopic) {
+    String auditTopic = "/audit" + String(sourceTopic);
+    _mqttClient->publish(auditTopic.c_str(), payload);
+    DB_PRINT("Audit message sent to topic: ");
+    DB_PRINTLN(auditTopic);
 }
 
 boolean EventSource::reconnect(char* topic) {
     boolean success = reconnect();
     if (success) {
         _mqttClient->subscribe(topic);
-        Serial.print("Subscribed to topic: ");
-        Serial.println(topic);
+        DB_PRINT("Subscribed to topic: ");
+        DB_PRINTLN(topic);
     }
     return success;
 }
@@ -81,19 +71,18 @@ boolean EventSource::reconnect(char* topic) {
 boolean EventSource::reconnect() {
     boolean success = false;
     while (!_mqttClient->connected()) {
-        Serial.println("Attempting connection to MQTT server");
+        DB_PRINTLN("Attempting connection to MQTT server");
         String clientId = "ESP8266-";
         clientId += String(random(0xffff), HEX);
         _mqttClient->setSocketTimeout(60);
-        Serial.println("Timeout set to 60s");
-        Serial.println(ESP.getFreeHeap());
-        Serial.println("Connecting...");
+        DB_PRINTLN("Timeout set to 60s");
+        DB_PRINTLN("Connecting...");
         if (success = _mqttClient->connect(clientId.c_str())) {
-            Serial.println("Successfully connected to MQTT server");
+            DB_PRINTLN("Successfully connected to MQTT server");
         } else {
-            Serial.print("MQTT connection failed: ");
-            Serial.println(_mqttClient->state());
-            Serial.println("Attempting retry in 5s...");
+            DB_PRINT("MQTT connection failed: ");
+            DB_PRINTLN(_mqttClient->state());
+            DB_PRINTLN("Attempting retry in 5s...");
             delay(5000);
         }
     }
